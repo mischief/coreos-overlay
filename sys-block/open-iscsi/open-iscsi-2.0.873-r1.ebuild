@@ -87,6 +87,8 @@ src_install() {
 	insopts -m0644
 
 	systemd_dotmpfilesd "${FILESDIR}"/open-iscsi.conf
+	systemd_dounit "${FILESDIR}"/iscsid.service
+	systemd_dounit "${FILESDIR}"/iscsid.socket
 
 	fperms 600 /etc/iscsi/iscsid.conf
 }
