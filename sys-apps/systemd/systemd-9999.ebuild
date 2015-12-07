@@ -1,6 +1,6 @@
 # Copyright 1999-2015 Gentoo Foundation
 # Distributed under the terms of the GNU General Public License v2
-# $Header: /var/cvsroot/gentoo-x86/sys-apps/systemd/systemd-9999.ebuild,v 1.184 2015/08/01 15:10:12 floppym Exp $
+# $Id$
 
 EAPI=5
 
@@ -13,7 +13,7 @@ if [[ ${PV} == 9999 ]]; then
 	# Use ~arch instead of empty keywords for compatibility with cros-workon
 	KEYWORDS="~amd64 ~arm64 ~arm ~x86"
 else
-	CROS_WORKON_COMMIT="8b6703e512639d87dc21e558a0ab9884ca5fd5b9"
+	CROS_WORKON_COMMIT="dd050decb6ad131ebdeabb71c4f9ecb4733269c0" # v228
 	KEYWORDS="amd64 arm64 ~arm ~x86"
 fi
 
@@ -160,7 +160,7 @@ src_unpack() {
 src_prepare() {
 	# Bug 463376
 	sed -i -e 's/GROUP="dialout"/GROUP="uucp"/' rules/*.rules || die
-
+	epatch "${FILESDIR}/CVE-2015-7510.patch"
 	autotools-utils_src_prepare
 }
 
@@ -170,11 +170,18 @@ src_configure() {
 	# Fix systems broken by bug #509454.
 	[[ ${MY_UDEVDIR} ]] || MY_UDEVDIR=/lib/udev
 
+	# Prevent conflicts with i686 cross toolchain, bug 559726
+	tc-export AR CC NM OBJCOPY RANLIB
+
 	multilib-minimal_src_configure
 }
 
 multilib_src_configure() {
 	local myeconfargs=(
+		# disable -flto since it is an optimization flag
+		# and makes distcc less effective
+		cc_cv_CFLAGS__flto=no
+
 		--with-pamconfdir=/usr/share/pam.d
 
 		# Workaround for gcc-4.7, bug 554454.
@@ -463,6 +470,14 @@ migrate_net_name_slot() {
 	fi
 }
 
+reenable_unit() {
+	if systemctl is-enabled --root="${ROOT}" "$1" &> /dev/null; then
+		ebegin "Re-enabling $1"
+		systemctl reenable --root="${ROOT}" "$1"
+		eend $? || FAIL=1
+	fi
+}
+
 pkg_postinst() {
 	newusergroup() {
 		enewgroup "$1"
@@ -496,6 +511,9 @@ pkg_postinst() {
 
 	# Migrate 80-net-name-slot.rules -> 80-net-setup-link.rules
 	migrate_net_name_slot
+
+	# Re-enable systemd-networkd for socket activation
+	reenable_unit systemd-networkd.service
 
 	if [[ ${FAIL} ]]; then
 		eerror "One of the postinst commands failed. Please check the postinst output"

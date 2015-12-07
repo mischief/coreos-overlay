@@ -134,3 +134,6 @@ dev-util/checkbashisms
 =app-misc/c_rehash-1.7-r1 ~amd64 ~arm64
 =dev-libs/openssl-1.0.2e ~amd64 ~arm64
 
+# systemd needs util-linux 2.27+ for libmount
+=sys-apps/util-linux-2.27.1 ~amd64 ~arm64
+
